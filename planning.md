@@ -9,114 +9,164 @@
 
 ## Domain
 
-<!-- What domain did you choose? Why is this knowledge valuable and hard to find through official channels? -->
+Data Structures and Algorithms
+
+Well these aren't hard to find knowledge base, but a popular topic for technical interview prep. 
 
 ---
 
 ## Documents
 
-<!-- List your specific sources: URLs, subreddit names, forum threads, or file descriptions.
-     Aim for at least 10 sources that together cover different subtopics or perspectives within your domain. -->
 
-| # | Source | Description | URL or location |
-|---|--------|-------------|-----------------|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
-| 4 | | | |
-| 5 | | | |
-| 6 | | | |
-| 7 | | | |
-| 8 | | | |
-| 9 | | | |
-| 10 | | | |
+| #   | Source  | Description                                                          | URL or location                                         |
+| --- | ------- | -------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1   | Copilot | advanced dynamic programming of definitions, examples, and code.     | documents/Advanced_Dynamic_Programming_Study_Guide.pdf  |
+| 2   | Copilot | arrays of definitions, examples, and code.                           | documents/Arrays_Study_Guide.pdf                        |
+| 3   | Copilot | backtracking of definitions, examples, and code.                     | documents/Backtracking_Study_Guide.pdf                  |
+| 4   | Copilot | dynamic programming of definitions, examples, and code.              | documents/Dynamic_Programming_Study_Guide.pdf           |
+| 5   | Copilot | graphs of definitions, examples, and code.                           | documents/Graphs_Study_Guide.pdf                        |
+| 6   | Copilot | greedy algorithms of definitions, examples, and code.                | documents/Greedy_Algorithms_Study_Guide.pdf             |
+| 7   | Copilot | queues of definitions, examples, and code.                           | documents/Queues_Study_Guide.pdf                        |
+| 8   | Copilot | stacks of definitions, examples, and code.                           | documents/Stacks_Study_Guide.pdf                        |
+| 9   | Copilot | trees of definitions, examples, and code.                            | documents/Trees_Study_Guide.pdf                         |
+| 10  | Copilot | two pointers and sliding windows of definitions, examples, and code. | documents/Two_Pointers_&_Sliding_Window_Study_Guide.pdf |
+
 
 ---
 
 ## Chunking Strategy
 
-<!-- How will you split documents into chunks?
-     State your chunk size (in tokens or characters), overlap size, and explain why those
-     numbers fit the structure of your documents.
-     A review-heavy corpus warrants different chunking than a long FAQ. -->
+Parent-child (Recursion)
 
-**Chunk size:**
+**Chunk size (child): ≤220 tokens** — *revised down from 512, see note below*
 
-**Overlap:**
+**Overlap: ~40 tokens**
 
-**Reasoning:**
+**Parent chunk: whole section (≤1200 tokens, not embedded)**
+
+**Reasoning: Documents contains compact but dense blocks of code and math, you want to ensure that a single chunk contains the entire concept. There are subsections roughly 60-100 words in length.** Parent-child allows headers to be the metadata of the paragraphs that'll be indexed and chunked. Children (small, precise) are what we embed and search; their **parent section** is what we hand to the LLM so it sees the full concept + code.
+
+> **Update during implementation (required by spec):** The original plan said
+> 512-token chunks. Measurement showed `all-MiniLM-L6-v2` truncates at **256
+> tokens**, so a 512-token chunk would be silently cut before embedding. Child
+> chunks were therefore capped at ~220 tokens (headroom under 256) so the whole
+> child is embedded; parents stay large because they are only read by the LLM.
+> Full rationale + measurements in `report.md` §2.
 
 ---
 
 ## Retrieval Approach
 
-<!-- Which embedding model are you using (e.g., all-MiniLM-L6-v2 via sentence-transformers)?
-     How many chunks will you retrieve per query (top-k)?
-     If you were deploying this for real users and cost wasn't a constraint, what tradeoffs
-     would you weigh in choosing a different embedding model — context length, multilingual
-     support, accuracy on domain-specific text, latency? -->
+**Embedding model: sentence-transformers (all-MiniLM-L6-v2)**
 
-**Embedding model:**
+**Top-k: 3** (parent sections; pulled from 20 fused child candidates)
 
-**Top-k:**
+**Retrieval mode: hybrid — BM25 keyword + semantic, fused with Reciprocal Rank Fusion**
 
-**Production tradeoff reflection:**
+**Semantic cutoff:** cosine similarity ≥ **0.55** (applied only to semantic-only mode)
+
+**Mode behavior:** `semantic` uses only semantic hits above the cutoff, `bm25` uses
+only keyword hits, and `hybrid` combines both (no fallback between single modes).
+
+**Production tradeoff reflection:** `all-MiniLM-L6-v2` is fast, free, and local,
+but it caps at 256 tokens and is English-only. If cost weren't a constraint I'd
+weigh a longer-context / higher-accuracy model (e.g. `bge-large` or an API model)
+against added latency and cost, plus multilingual coverage if the audience needed
+it. For this English, short-section corpus, MiniLM is the right default.
 
 ---
 
 ## Evaluation Plan
 
-<!-- List your 5 test questions with their expected correct answers.
-     Questions should be specific enough that you can judge whether the system's response
-     is right or wrong. "What are good dining halls?" is too vague.
-     "What do students say about wait times at [dining hall name] during lunch?" is testable. -->
 
-| # | Question | Expected answer |
-|---|----------|-----------------|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| 4 | | |
-| 5 | | |
+| #   | Question                                                                                         | Expected answer                                                                    |
+| --- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 1   | Which shortest-path algorithm handles graphs with negative edge weights, and what can it detect? | Bellman-Ford; used when edges may be negative, detects negative cycles.            |
+| 2   | In the greedy interval scheduling pattern, what should you sort intervals by?                    | Sort by end time (finish earliest), then choose an interval if it doesn't overlap. |
+| 3   | What are the four key components of the universal backtracking template?                         | N/A                                                                                |
+| 4   | In the LCA function, what is returned when both left and right recursive calls return a node?    | The current node (root).                                                           |
+| 5   | What is the time complexity of Dijkstra's algorithm with a min-heap?                             | N/A                                                                                |
+
 
 ---
 
 ## Anticipated Challenges
 
-<!-- What could go wrong? Name at least two specific risks with reasoning.
-     Consider: noisy or inconsistent documents, missing source attribution, off-topic
-     retrieval, chunks that split key information across boundaries. -->
+1. **Broken word spacing on extraction** — pdfplumber's default `x_tolerance`
+  glues words together on these PDFs (`Arraysarethefoundation…`). Mitigated with
+   `x_tolerance=1`.
+2. **Embedder truncation** — sections can exceed the 256-token embedder window,
+  silently dropping text. Mitigated by sizing children under the window
+   (parent-child split).
+3. **Header detection misses** — headings starting with a digit (`3.1 1D DP`)
+  broke the first regex and merged sections. Caught via chunk inspection and fixed.
+4. **Keyword-exact queries** — semantic search can miss queries that hinge on a
+  literal phrase ("four key components"). Mitigated with hybrid BM25 + semantic.
+5. **Corpus coverage gaps** — the guides omit some facts (e.g. Big-O of Dijkstra);
+  the system must refuse rather than hallucinate (see eval Q5).
 
-1.
+---
 
-2.
+## Stretch Features (added after the core build — spec updated before each)
+
+- **Hybrid search** — BM25 + semantic fused with RRF; compared against
+semantic-only in `eval_results.md` (hybrid 5/5 vs semantic 4/5).
+- **Metadata filtering** — filter retrieval by document/topic; exposed in the UI.
+- **Conversational memory** — multi-turn; follow-ups are rewritten to standalone
+queries before retrieval.
+- **Chunking/extraction comparison** — pdfplumber vs spacy-layout, benchmarked in
+`report.md` §1.
 
 ---
 
 ## Architecture
 
-<!-- Draw a diagram of your pipeline showing the five stages:
-     Document Ingestion → Chunking → Embedding + Vector Store → Retrieval → Generation
-     Label each stage with the tool or library you're using.
-     You can use ASCII art, a Mermaid diagram, or embed a sketch as an image.
-     You'll use this diagram as context when prompting AI tools to implement each stage. -->
+```
+                 ┌──────────────┐
+   documents/*.pdf │  Ingestion   │  pdfplumber (x_tolerance=1) + clean
+                 │ extractors.py│  [alt: spacy-layout]
+                 └──────┬───────┘
+                        ▼
+                 ┌──────────────┐
+                 │  Chunking    │  spaCy sentences → parent (section)
+                 │ chunking.py  │  + child (≤220 tok) + metadata
+                 └──────┬───────┘
+                        ▼
+              ┌──────────────────┐
+              │ Embed + Store    │  all-MiniLM-L6-v2 → ChromaDB
+              │ vectorstore.py   │  (children embedded; parents on disk)
+              └────────┬─────────┘
+                       ▼
+              ┌──────────────────┐
+              │  Retrieval       │  BM25 + semantic → RRF fusion
+              │ retrieval.py     │  metadata filter → expand child→parent
+              └────────┬─────────┘
+                       ▼
+              ┌──────────────────┐
+              │  Generation      │  Groq llama-3.3-70b (grounded) +
+              │ rag.py           │  conversational memory + citations
+              └────────┬─────────┘
+                       ▼
+              ┌──────────────────┐
+              │  Interface       │  Gradio web UI (app.py)
+              └──────────────────┘
+```
 
 ---
 
 ## AI Tool Plan
 
-<!-- For each part of the pipeline below, describe:
-     - Which AI tool you plan to use (Claude, Copilot, ChatGPT, etc.)
-     - What you'll give it as input (which sections of this planning.md, which requirements)
-     - What you expect it to produce
-     - How you'll verify the output matches your spec
+**Milestone 3 — Ingestion and chunking:** Prompt the AI with this Documents +
+Chunking sections and the diagram to implement `extractors.py` (pdfplumber +
+spacy-layout returning labelled blocks) and `chunking.py` (parent-child split on
+spaCy sentence boundaries with header metadata). Verify by inspecting sample chunks.
 
-     "I'll use AI to help me code" is not a plan.
-     "I'll give Claude my Chunking Strategy section and ask it to implement chunk_text()
-     with my specified chunk size and overlap" is a plan. -->
+**Milestone 4 — Embedding and retrieval:** Give the AI the Retrieval Approach
+section to implement `vectorstore.py` (ChromaDB + MiniLM) and `retrieval.py`
+(hybrid BM25 + semantic with RRF and metadata filtering). Validate gold-section
+hit rate per mode.
 
-**Milestone 3 — Ingestion and chunking:**
-
-**Milestone 4 — Embedding and retrieval:**
-
-**Milestone 5 — Generation and interface:**
+**Milestone 5 — Generation and interface:** Provide the grounding requirement and
+output format to implement `rag.py` (Groq, programmatic source attribution,
+conversational memory) and `app.py` (Gradio). Verify grounding holds on an
+out-of-scope query.

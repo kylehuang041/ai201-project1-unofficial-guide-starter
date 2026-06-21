@@ -1,11 +1,21 @@
-sentence-transformers==3.4.1
-chromadb>=0.6.0
-groq==0.15.0
-python-dotenv==1.0.1
+# --- Core RAG stack ---
+sentence-transformers==3.4.1   # local embeddings (all-MiniLM-L6-v2)
+chromadb>=0.6.0                # local vector store
+groq==0.15.0                   # LLM (llama-3.3-70b-versatile)
+python-dotenv==1.0.1           # load GROQ_API_KEY from .env
 
-# Query interface — add whichever you use for Milestone 5:
-# gradio>=6.9.0
-# streamlit>=1.40.0
+# --- Document ingestion ---
+pdfplumber==0.11.4             # primary PDF text extractor
+spacy==3.8.14                  # sentence segmentation + header heuristics
+# spaCy English model (install once after pip install):
+#   python -m spacy download en_core_web_sm
 
-# Document ingestion — add if your documents/ folder contains .pdf files:
-# pdfplumber==0.11.4
+# --- Retrieval ---
+rank-bm25==0.2.2               # BM25 keyword search for hybrid retrieval
+
+# --- Query interface ---
+gradio>=6.0                    # web UI (app.py)
+
+# --- Optional: extractor comparison (heavy: pulls docling + torch models) ---
+# Only needed to run `python -m src.build_index --extractor spacy-layout`.
+# spacy-layout==0.0.12
